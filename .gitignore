@@ -5,3 +5,5 @@ supervisor/log
 logs
 tmp
 venv
+__pychache__
+.idea
