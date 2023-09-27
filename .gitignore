@@ -1,0 +1,7 @@
+.env
+*.conf
+verif_bot.egg-info
+supervisor/log
+logs
+tmp
+venv

@@ -1,0 +1,142 @@
+from bot.handler.services.order.common import AbstractOrderService
+import bot.states as states
+from bot.handler.dto.common import BaseOrderDto
+from bot.handler.utils import StepTwoKeyboardFactory, StepTwoMessageFactory
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, CallbackQuery
+
+
+# for Wallet, BaseBundle (Bundle, Debit)
+class BaseOrderService(AbstractOrderService):
+
+    def __init__(self, api, _type=None):
+        super().__init__(api, _type=_type)
+        self.stepTwoMessageFactory = StepTwoMessageFactory(builder=self.messageBuilder)
+        self.stepTwoKeyboardFactory = StepTwoKeyboardFactory()
+
+    def display_service_list(self, message: Message, state: FSMContext):
+        """More of an abstract method for real procedure of displaying service list"""
+        pass
+
+    def _step_two_state(self, service_type):
+        """Getting step two which in fact is selecting service after selecting order type"""
+        service_type = service_type if service_type else self.type
+        return states.StepTwoFactory().get_step_two_state(service_type)
+
+    async def _base_step_two(self, message: Message, state: FSMContext, subtype: str = None):
+        """Getting and displaying service list of order type without order cache"""
+        _type = f"{self.type}_{subtype}" if subtype else self.type
+        get_list_resp = await self.api.get_service_list(_type=_type, chat_id=message.chat.id)
+        answer = f""
+        markup = None
+
+        if self._check_response(response=get_list_resp):
+            order_list = get_list_resp['list']
+            await state.update_data(order_list=order_list)
+            answer += self.stepTwoMessageFactory.get_step_two_message(self.type, {'_type': self.type,
+                                                                                  'service_list': order_list,
+                                                                                  'page': 1})
+            markup = self.stepTwoKeyboardFactory.get_step_two_keyboard(self.type, {'_type': self.type,
+                                                                                   'service_list': order_list,
+                                                                                   'page': 1})
+            await state.set_state(self._step_two_state(self.type))
+        else:
+            answer += self._handle_response_error(response=get_list_resp)
+            await state.clear()  # очищаем state, чтобы не появилось кнопок, потому как системная ошибка
+
+        await message.answer(answer, reply_markup=markup, parse_mode='MarkdownV2')
+
+    async def turn_page(self, callback: CallbackQuery, state: FSMContext, backward=False):
+        """Making it base method as there may be more services in bundle type or new order types which
+        need paginated service list"""
+        user_data = await state.get_data()
+        order_list = user_data['order_list']
+        next_page = user_data['page'] - 1 if backward else user_data['page'] + 1
+        if next_page < 1 or next_page > (len(order_list) // 10 + 1):
+            await callback.answer(self.messageBuilder.unavailable())
+            return
+
+        answer = self.stepTwoMessageFactory.get_step_two_message(self.type, {'_type': self.type,
+                                                                             'service_list': order_list,
+                                                                             'page': next_page})
+        inline_markup = self.stepTwoKeyboardFactory.get_step_two_keyboard(self.type, {'_type': self.type,
+                                                                                      'service_list': order_list,
+                                                                                      'page': next_page})
+        await callback.message.edit_text(answer, parse_mode='MarkdownV2')
+        await callback.message.edit_reply_markup(inline_message_id=callback.inline_message_id,
+                                                 reply_markup=inline_markup)
+        await state.update_data(page=next_page)
+
+    async def _set_service_from_message(self, message: Message, state: FSMContext, tg_username=False):
+        """Gets order form after choosing service from reply markup service list (via message)"""
+        order = message.text
+        service_short = self._get_shortname(order)
+        service_price = self._get_price(order)
+
+        dto_kwargs = {'service': service_short, 'price': float(service_price)}
+        if tg_username:
+            dto_kwargs['telegram'] = f"@{message.chat.username}"
+        dto = self.dtoFactory.get_dto(self.type, **dto_kwargs)
+        answer, inline_markup = self._get_form(dto=dto, username=message.chat.username)
+        order_form = await message.answer(answer, parse_mode='MarkdownV2', reply_markup=inline_markup)
+        await message.delete()
+        await state.update_data(order_dto=dto)
+        await state.update_data(order_form=order_form)
+        await state.set_state(self._form_state())
+
+    async def _set_service_from_callback(self, callback: CallbackQuery, state: FSMContext, tg_username=False):
+        """Gets order form after choosing service from paginated service list (via callback)"""
+        user_data = await state.get_data()
+        service_list = user_data['order_list']
+        service_short = callback.data
+
+        service_price = 0
+        for service in service_list:
+            if service['short'] == service_short:
+                service_price = service['price']
+                break
+        if not service_price:
+            await callback.answer('Некорректный сервис!')
+            return
+
+        dto_kwargs = {'service': service_short, 'price': float(service_price)}
+        if tg_username:
+            dto_kwargs['telegram'] = f"@{callback.message.chat.username}"
+        dto = self.dtoFactory.get_dto(self.type, **dto_kwargs)
+        answer, inline_markup = self._get_form(dto=dto, username=callback.message.chat.username)
+        order_form = await callback.message.answer(answer, parse_mode='MarkdownV2', reply_markup=inline_markup)
+        await callback.message.delete()
+        await state.update_data(order_dto=dto)
+        await state.update_data(order_form=order_form)
+        await state.set_state(self._form_state())
+
+    async def _post_set(self, form: CallbackQuery, state: FSMContext, dto: BaseOrderDto,
+                        param_msg: Message | None = None):
+        """Procedure done after updating order_dto in form states"""
+        await self._update_form(form=form, dto=dto)
+        await state.update_data(order_dto=dto)
+        await state.set_state(self._form_state())
+        if type(param_msg) == Message:
+            await param_msg.delete()
+
+    async def change_amount(self, callback: CallbackQuery, state: FSMContext):
+        """For quantiable"""
+        await state.update_data(order_form=callback)
+        await state.set_state(states.Order.inputAmount)
+        amount_msg = await callback.answer(self.messageBuilder.input_amount(), show_alert=True)
+        await state.update_data(amount_msg=amount_msg)
+
+    async def set_amount(self, message: Message, state: FSMContext):
+        """For quantiable"""
+        amount = message.text.strip()
+        if amount.isdigit():
+            user_data = await state.get_data()
+            dto = user_data['order_dto']
+            form: CallbackQuery = user_data['order_form']
+            amount_msg: Message = user_data['amount_msg']
+            dto.set_amount(int(amount))
+            await self._post_set(state=state, dto=dto, form=form, param_msg=amount_msg)
+        else:
+            await message.answer(self.messageBuilder.incorrect_input())
+
+        await message.delete()
