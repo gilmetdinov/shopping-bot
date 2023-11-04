@@ -18,6 +18,7 @@ class App:
         self.webApp = WebApp(bot=self.bot, dp=self.dp, api=self.apiCli)
         self.logInfo = logging.INFO
         self.logWarn = logging.WARNING
+        self.logErr = logging.ERROR
         self.loop = asyncio.new_event_loop()
 
     @classmethod
@@ -25,7 +26,7 @@ class App:
         logging.basicConfig(filename=filename,
                             filemode='a',
                             format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                            datefmt='%H:%M:%S',
+                            datefmt='%D %H:%M:%S',
                             level=level)
         logging.info(f"Setting up {name} logger")
         return logging.getLogger(name)
@@ -43,52 +44,50 @@ class App:
                 try:
                     await session.close()
                     logging.log(self.logInfo, f"Closed session {id(session)}")
-                except Exception:
-                    logging.log(self.logWarn, f"Couldn't close session {id(session)}")
+                except Exception as e:
+                    logging.log(self.logErr, f"Couldn't close session {id(session)}\nError: {str(e)}")
         else:
             logging.log(self.logInfo, f"No open sessions found")
 
     async def on_startup(self) -> None:
-        await self.bot.close_session()
+        try:
+            if await self.bot.set_webhook():
+                logging.log(self.logInfo, "Webhook url set successfully")
+            else:
+                logging.log(self.logWarn, "Couldn't set up webhook url!")
 
-        if await self.bot.set_webhook():
-            logging.log(self.logInfo, "Webhook url set successfully")
-        else:
-            logging.log(self.logWarn, "Couldn't set up webhook url!")
-
-        if await self.bot.set_commands():
-            logging.log(self.logInfo, "Commands set successfully")
-        else:
-            logging.log(self.logWarn, "Couldn't set up commands!")
-
-        await self.bot.close_session()
+            if await self.bot.set_commands():
+                logging.log(self.logInfo, "Commands set successfully")
+            else:
+                logging.log(self.logWarn, "Couldn't set up commands!")
+        except Exception as e:
+            logging.log(self.logErr, f"Couldn't set up webhook url and/or commands!\nError: {str(e)}\nType: {type(e)}")
+        finally:
+            await self.bot.close_session()
 
     async def on_shutdown(self) -> None:
         await self.bot.close_session()
+        try:
+            if await self.bot.delete_webhook():
+                logging.log(self.logInfo, "Successfully deleted webhook url")
+            else:
+                logging.log(self.logWarn, "Couldn't delete webhook url!")
 
-        if await self.bot.delete_webhook():
-            logging.log(self.logInfo, "Successfully deleted webhook url")
-        else:
-            logging.log(self.logWarn, "Couldn't delete webhook url!")
-
-        if await self.bot.delete_commands():
-            logging.log(self.logInfo, "Successfully deleted commands")
-        else:
-            logging.log(self.logWarn, "Couldn't delete commands!")
-
-        await self.bot.close_session()
+            if await self.bot.delete_commands():
+                logging.log(self.logInfo, "Successfully deleted commands")
+            else:
+                logging.log(self.logWarn, "Couldn't delete commands!")
+        except Exception as e:
+            logging.log(self.logErr, f"Couldn't delete webhook url and/or commands!\nError: {str(e)}\nType: {type(e)}")
+        finally:
+            await self.bot.close_session()
 
     def run(self):
         logging.basicConfig(filename='logs/info.log',
                             filemode='a',
                             format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                            datefmt='%H:%M:%S',
+                            datefmt='%D %H:%M:%S',
                             level=self.logInfo)
-
-        self.loop.run_until_complete(self.__close_sessions())
-
-        self.loop.close()
-        self.loop = asyncio.new_event_loop()
 
         self.loop.run_until_complete(self.on_startup())
 
