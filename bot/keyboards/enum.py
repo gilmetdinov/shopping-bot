@@ -120,12 +120,16 @@ class KeyboardEnum(Enum):
         'qw_sim': '📱 QIWI Проф Без карты',
         'qw': '💳 QIWI проф + Неименная карта',
         'qw_big': '👑 QIWI Premium',
-        'paypal': '🅿️ PayPal'
+        'paypal': '🅿️ PayPal',
+        'qw_ozon': '🥝🅾️ QIWI + OZON',
+        'qw_yoomoney': '🥝🟣 QIWI + ЮMoney',
+        'qw_ozon_yoomoney': '🥝🅾️🟣 QIWI + OZON + ЮMoney'
     }
     debitType = {
         'qw_noname': 'QIWI неименная',
         'tink_plat': 'Тинькофф',
         'altyn-i': 'Алтын банк Казахстан',
+        'raif_gold_visa': 'Райффайзен',
         'alfa_basic': 'Альфа Банк',
         'avangard': 'Авангард',
         'vost_moment': 'Восточный',
