@@ -3,10 +3,8 @@ FROM python:3.10
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git \
     curl \
-	openssl \
-    gunicorn3 \
+    openssl \
     python3-venv \
     supervisor
 

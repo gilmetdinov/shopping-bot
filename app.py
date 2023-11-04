@@ -30,7 +30,27 @@ class App:
         logging.info(f"Setting up {name} logger")
         return logging.getLogger(name)
 
+    @classmethod
+    async def __get_open_sessions(cls):
+        return [task.__dict__['session'] for task in asyncio.all_tasks() if
+                hasattr(task, '__dict__') and 'session' in task.__dict__]
+
+    async def __close_sessions(self):
+        open_sessions = await self.__get_open_sessions()
+        if open_sessions:
+            logging.log(self.logInfo, f"Open sessions found: {len(open_sessions)}")
+            for session in open_sessions:
+                try:
+                    await session.close()
+                    logging.log(self.logInfo, f"Closed session {id(session)}")
+                except Exception:
+                    logging.log(self.logWarn, f"Couldn't close session {id(session)}")
+        else:
+            logging.log(self.logInfo, f"No open sessions found")
+
     async def on_startup(self) -> None:
+        await self.bot.close_session()
+
         if await self.bot.set_webhook():
             logging.log(self.logInfo, "Webhook url set successfully")
         else:
@@ -64,6 +84,11 @@ class App:
                             format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                             datefmt='%H:%M:%S',
                             level=self.logInfo)
+
+        self.loop.run_until_complete(self.__close_sessions())
+
+        self.loop.close()
+        self.loop = asyncio.new_event_loop()
 
         self.loop.run_until_complete(self.on_startup())
 

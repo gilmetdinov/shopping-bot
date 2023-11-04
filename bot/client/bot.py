@@ -14,16 +14,20 @@ class BotClient:
         self.__message_builder = _message.Builder()
 
     async def set_webhook(self):
+        await self.close_session()
         return await self.instance.set_webhook(self.__webhookUrl)
 
     async def delete_webhook(self):
+        await self.close_session()
         return await self.instance.delete_webhook()
 
     async def set_commands(self):
         commands = bot.commands.get_commands_array()
+        await self.close_session()
         return await self.instance.set_my_commands(commands, BotCommandScopeDefault())
 
     async def delete_commands(self):
+        await self.close_session()
         return await self.instance.delete_my_commands(BotCommandScopeDefault())
 
     async def close_session(self):
@@ -40,6 +44,7 @@ class BotClient:
         success_chat_ids = []
         fail_chat_ids = []
         for chat_id in chat_ids:
+            await self.close_session()
             if await self.send_message(chat_id, message, parse_mode=parse_mode):
                 success_chat_ids.append(chat_id)
             else:
@@ -55,5 +60,6 @@ class BotClient:
     async def send_notification_mass(self, chat_ids: list, notif_type, contents):
         message = self.__message_builder.notification(notif_type=notif_type, contents=contents)
         if message:
+            await self.close_session()
             return await self.send_message_mass(chat_ids=chat_ids, message=message, parse_mode='MarkdownV2')
         return False
