@@ -114,7 +114,10 @@ class KeyboardEnum(Enum):
         'wallet_91': '🇪🇺 Curve EU + VCC',
         'wallet_92': '🇪🇺 Anycoindirect EU',
         'wallet_93': '🇪🇺 Crypterium EU',
-        "wallet_94": "💱 Huobi"
+        "wallet_94": "💱 Huobi",
+        'wallet_95': "Bybit СНГ",
+        'wallet_96': 'Kukoin СНГ',
+        'wallet_97': '🇪🇺 Bybit EU'
     }
     bundleType = {
         'qw_sim': '📱 QIWI Проф Без карты',
