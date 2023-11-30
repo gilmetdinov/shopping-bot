@@ -4,8 +4,6 @@ import bot.handler.utils as utils
 from bot.handler.dto import DtoFactory
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
-from bot.helper import KeyboardHelper
-from bot.keyboards import OrderListFactory
 from bot.states import FormFactory
 
 
@@ -17,13 +15,15 @@ class AbstractOrderService(AbstractService):
         self.formMessageFactory = utils.FormMessageFactory(self.messageBuilder)
         self.formKeyboardFactory = utils.FormKeyboardFactory()
         self.formStateFactory = FormFactory()
-        self.serviceListFactory = OrderListFactory()
+        # self.serviceListFactory = OrderListFactory()
         self.dtoFactory = DtoFactory()
 
     def _form_state(self):
         return self.formStateFactory.get_form_state(self.type)
 
+    '''
     def _get_shortname(self, order: str) -> str:
+        """Outdated, static service list is not used anymore"""
         try:
             service_list = self.serviceListFactory.get_order_list(self.type)
             service_list_reverse = KeyboardHelper.key_value_reverse(service_list)
@@ -32,11 +32,14 @@ class AbstractOrderService(AbstractService):
         except Exception:
             self.logger.log(self.logger.ERROR, f"Couldn't get shortname from {order}!")
             return 'error'
+    '''
 
+    '''
     @classmethod
     def _get_price(cls, order: str) -> float:
         """Gets price from reply markup: service_name: (price р.)"""
         return KeyboardHelper.get_price(order)
+    '''
 
     async def _check_balance(self, chat_id, price):
         """Sends request to get user's balance
@@ -66,6 +69,28 @@ class AbstractOrderService(AbstractService):
             await message.edit_text(new_form, parse_mode='MarkdownV2', reply_markup=inline_markup)
         except TelegramBadRequest:
             pass
+
+    async def _get_service_list(self, message: Message, state: FSMContext,
+                                user_data: dict | None = None, force_update: bool = False,
+                                _type: str | None = None) -> list | None:
+        """Gets service list from state data or from api by type"""
+        user_data = await state.get_data() if not force_update and user_data is None else user_data
+        service_list: list or None = user_data['service_list'] \
+            if not force_update and user_data and 'service_list' in user_data.keys() else None
+        if service_list is None:
+            _type = _type or self.type
+            get_list_resp = await self.api.get_service_list(_type=_type, chat_id=message.chat.id)
+            if not self._check_response(response=get_list_resp):
+                answer = self._handle_response_error(response=get_list_resp)
+                await message.answer(answer, parse_mode=self.MD)
+                await state.clear()
+                return
+            service_list = [
+                service | {'full_label': f"{service['label']} ({service['price']} р.)"}
+                for service in get_list_resp['list']
+            ]
+            await state.update_data(service_list=service_list)
+        return service_list
 
     async def step_two(self, message: Message, state: FSMContext):
         """Second step of any order (they differ greatly from type to type)"""

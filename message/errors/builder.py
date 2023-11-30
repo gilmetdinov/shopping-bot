@@ -119,6 +119,11 @@ class ErrorMessageBuilder:
             if is_bind else ""
         return message, False
 
+    def get_incorrect_service_message(self):
+        return (f"Выбранный Вами сервис не найден."
+                f"\nЕсли Вы уверены, что выбрали корректный сервис, пожалуйста, обратитесь в нашу поддержку:"
+                f"{self.supportTg}"), False
+
     @classmethod
     def get_incorrect_input_message(cls):
         return f"Не удалось распознать Ваш ответ.", False

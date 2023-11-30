@@ -8,8 +8,8 @@ class DeliveryDto(BaseOrderDto):
     phone_number = None
     delivery_type = DeliveryType.PickUpPoint.value
 
-    def __init__(self, service: str, price: float, telegram: str = None, _type: str = None):
-        super().__init__(_type=_type, service=service, price=price)
+    def __init__(self, service: str, service_label: str, price: float, telegram: str = None, _type: str = None):
+        super().__init__(_type=_type, service=service, service_label=service_label, price=price)
         self.telegram = telegram
         self.total_price = self.price * self.amount
 

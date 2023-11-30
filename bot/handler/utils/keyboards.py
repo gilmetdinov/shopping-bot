@@ -63,11 +63,8 @@ def wallet_category_keyboard() -> ReplyKeyboardMarkup:
 def service_reply_keyboard(_type, service_list) -> ReplyKeyboardMarkup:
     keyboard_builder = keyboards.Builder(is_custom=True)
 
-    order_list = keyboards.OrderListFactory().get_order_list(_type)
-    if order_list:
-        buttons = []
-        for service in service_list:
-            buttons.append(f"{order_list[service['short']]} ({service['price']} р.)")
+    if service_list:
+        buttons = [service['full_label'] for service in service_list]
         keyboard_builder.add_row(buttons, row_width=2)
     keyboard_builder.add_row(keyboards.List.goBack.value)
     return keyboard_builder.get_custom_keyboard()

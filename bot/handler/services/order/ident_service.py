@@ -83,31 +83,35 @@ class IdentService(AbstractOrderService):
 
     async def choose_service(self, callback: CallbackQuery, state: FSMContext):
         """Displaying reply markup of available services for ident: service_name (price р.)"""
-        get_list_resp = await self.api.get_service_list(_type=self.type, chat_id=callback.message.chat.id)
-        answer = f""
-        reply_markup = None
         await state.update_data(order_form=callback)
-
-        if self._check_response(response=get_list_resp):
-            order_list = get_list_resp['list']
-            answer += self.messageBuilder.choose_service()
-            reply_markup = utils.service_reply_keyboard(_type=self.type, service_list=order_list)
-            await state.set_state(states.Order.setService)
-        else:
-            answer += self._handle_response_error(response=get_list_resp)
-            await state.clear()  # очищаем state, потому как системная ошибка
-        answer_msg = await callback.message.answer(answer, reply_markup=reply_markup, parse_mode='MarkdownV2')
+        service_list = await self._get_service_list(message=callback.message, state=state, force_update=True)
+        answer = self.messageBuilder.choose_service()
+        reply_markup = utils.service_reply_keyboard(_type=self.type, service_list=service_list)
+        await state.set_state(states.Order.setService)
+        answer_msg = await callback.message.answer(answer, reply_markup=reply_markup, parse_mode=self.MD)
         await state.update_data(service_msg=answer_msg)
 
     async def set_service(self, message: Message, state: FSMContext):
         """Setting service with splitting chosen reply markup button on service shortname and price"""
-        order = message.text.strip()
-        service = self._get_shortname(order=order)
-        price = self._get_price(order=order)
         user_data = await state.get_data()
+        service_list: list = await self._get_service_list(message=message, state=state, user_data=user_data)
 
+        message_text = message.text.strip()
+        chosen_service: dict or None = next(
+            (service for service in service_list if service['full_label'] == message_text),
+            None
+        )
+        if chosen_service is None:
+            answer = self.messageBuilder.incorrect_service()
+            reply_markup = utils.service_reply_keyboard(_type=self.type, service_list=service_list)
+            await message.answer(answer, reply_markup=reply_markup, parse_mode=self.MD)
+            return
+
+        service_short, service_label, service_price = (chosen_service['short'],
+                                                       chosen_service['label'],
+                                                       float(chosen_service['price']))
         dto: IdentDto = user_data['order_dto']
-        dto.set_service(service=service, price=price)
+        dto.set_service(service=service_short, service_label=service_label, price=service_price)
         await state.update_data(order_dto=dto)
         await state.set_state(self._form_state())
 

@@ -14,10 +14,9 @@ class BundleProcess(AbstractProcess):
         self.service = BundleService(api=self.api)
 
     def set(self):
-        for bundleType in List.bundleType.value.values():
-            @self.router.message(
-                states.Order.choosingBundle,
-                F.text.contains(bundleType)
-            )
-            async def set_bundle_type(message: Message, state: FSMContext) -> None:
-                await self.service.set_service(message=message, state=state)
+        @self.router.message(
+            states.Order.choosingBundle,
+            F.text.not_contains(List.goBack.value[0])
+        )
+        async def set_bundle_type(message: Message, state: FSMContext) -> None:
+            await self.service.set_service(message=message, state=state)

@@ -17,5 +17,5 @@ class AbstractProcess(ABC):
 
     @abstractmethod
     def set(self):
-        """Setting State + Message/Callback or Command routes for service methods"""
+        """Setting State + Message/Callback or Command routes for various service methods"""
         pass

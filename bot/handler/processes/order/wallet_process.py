@@ -25,14 +25,13 @@ class WalletProcess(AbstractProcess):
 
         @self.router.callback_query(
             states.Order.choosingWallet,
-            Text(startswith="wallet_")
-        )
-        async def wallet_chosen(callback: CallbackQuery, state: FSMContext) -> None:
-            await self.service.set_service(callback=callback, state=state)
-
-        @self.router.callback_query(
-            states.Order.choosingWallet,
             Text(Callbacks.GoBack.value)
         )
         async def go_back_from_wallet(callback: CallbackQuery, state: FSMContext) -> None:
             await self.service.step_two(message=callback.message, state=state)
+
+        @self.router.callback_query(
+            states.Order.choosingWallet
+        )
+        async def wallet_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+            await self.service.set_service(callback=callback, state=state)

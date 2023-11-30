@@ -35,20 +35,18 @@ class IdentProcess(AbstractProcess):
         async def choose_service(callback: CallbackQuery, state: FSMContext) -> None:
             await self.service.choose_service(callback=callback, state=state)
 
-        for identType in List.identType.value.values():
-            @self.router.message(
-                states.Order.setService,
-                F.text.contains(identType)
-            )
-            async def set_service(message: Message, state: FSMContext) -> None:
-                await self.service.set_service(message=message, state=state)
-
         @self.router.message(
             states.Order.setService,
             F.text.in_(List.goBack.value)
         )
         async def service_go_back(message: Message, state: FSMContext) -> None:
             await self.service.service_go_back(message=message, state=state)
+
+        @self.router.message(
+            states.Order.setService,
+        )
+        async def set_service(message: Message, state: FSMContext) -> None:
+            await self.service.set_service(message=message, state=state)
 
         @self.router.callback_query(
             states.Order.identForm,

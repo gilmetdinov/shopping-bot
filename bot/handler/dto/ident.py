@@ -8,6 +8,7 @@ class IdentDto(AbstractOrderDto):
         super().__init__(_type='ident')
         self.order_cache_id = order_cache['id']
         self.service = order_cache['service']
+        self.service_label = order_cache['service_label']
         self.service_price = order_cache['service_price']
         self.wallet = order_cache['wallet'] or None
         # todo MD: не реализован заказ с кастомными данными,
@@ -39,8 +40,9 @@ class IdentDto(AbstractOrderDto):
                             'img_three': ImageDto()}
         return True
 
-    def set_service(self, service, price: int | float):
+    def set_service(self, service, service_label: str, price: int | float):
         self.service = service
+        self.service_label = service_label
         self.price -= self.service_price
         self.service_price = int(price) if float(price).is_integer() else price
         self.price += self.service_price

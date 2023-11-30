@@ -6,7 +6,6 @@ from utils.enums import OrderStatus, ErrorCodes
 from bot.keyboards import List
 import message.errors as errors
 from bot.handler.dto import *
-from bot.keyboards import OrderListFactory
 from message.enum import Prompts
 
 load_dotenv()
@@ -34,7 +33,6 @@ class MessageBuilder:
         self.errorHandler = errors.Builder(support_tg=self.supportTg, settings_url=self.settingsUrl)
         self.tsConverter = DateHelper
         self.orderStatus = OrderStatus
-        self.orderListFactory = OrderListFactory()
 
         # обработанные ссылки (тг + название проекта)
         self.redactedChannelList = self.__get_redacted_channel_list()
@@ -123,6 +121,11 @@ class MessageBuilder:
 
     def incorrect_input(self, remove_entities: bool | None = None):
         body, _remove_entities = self.errorHandler.get_incorrect_input_message()
+        return self.__build(body=body,
+                            remove_entities=remove_entities if remove_entities is not None else _remove_entities)
+
+    def incorrect_service(self, remove_entities: bool | None = None):
+        body, _remove_entities = self.errorHandler.get_incorrect_service_message()
         return self.__build(body=body,
                             remove_entities=remove_entities if remove_entities is not None else _remove_entities)
 
@@ -282,44 +285,43 @@ class MessageBuilder:
                        f"- ФИО получателя;\n" \
                        f"- Номер телефона получателя;\n" \
                        f"- Телеграм для связи;"
-        text_to_redact = f"Пожалуйста, выберете тип комплекта.\n" + requirements
+        text_to_redact = (f"Пожалуйста, выберете тип комплекта.\nДоставка комплекта доступна при покупке от 3 штук.\n"
+                          + requirements)
         body = self.__get_redacted(text=text_to_redact)
         return self.__build(body=body)
 
     def service_pagination_list(self, _type, service_list, page=1):
         body = f""
-        order_list = OrderListFactory().get_order_list(_type)
         for i in range(len(service_list[10 * (page - 1):10 * page])):
-            service_name = self.__get_redacted(order_list[service_list[i + 10 * (page - 1)]['short']])
+            service_name = self.__get_redacted(service_list[i + 10 * (page - 1)]['label'])
             price = self.__get_redacted(service_list[i + 10 * (page - 1)]['price'])
             body += f"*{i + 1}*\. {service_name} \- {price} р\.\n"
         return self.__build(body=body)
 
     def get_ident_form(self, dto: IdentDto):
-        service = f"*Сервис:* {List.identType.value[dto.service]}"
+        service = f"*Сервис:* {self.__get_redacted(dto.service_label)}"
         wallet_number = f"*Номер кошелька:* {dto.wallet or ''}"
-        docs_type = f"*Тип данных для идентификации:* {self.__get_redacted(text=List.docsType.value[dto.docs_type])}"
-        total_price = f"*К оплате:* {self.__get_redacted(text=str(dto.price))} р\."
+        docs_type = f"*Тип данных для идентификации:* {self.__get_redacted(List.docsType.value[dto.docs_type])}"
+        total_price = f"*К оплате:* {self.__get_redacted(str(dto.price))} р\."
         body = f"Заказ идентификации:\n{service}\n{wallet_number}\n{docs_type}\n{total_price}"
         return self.__build(body=body)
 
     def get_wallet_form(self, dto: WalletDto):
-        service = f"*Сервис:* {self.__get_redacted(text=List.walletType.value[dto.service])}"
+        service = f"*Сервис:* {self.__get_redacted(dto.service_label)}"
         amount = f"*Количество:* {dto.amount}"
-        total_price = f"*К оплате:* {self.__get_redacted(text=str(dto.total_price))} р\."
+        total_price = f"*К оплате:* {self.__get_redacted(str(dto.total_price))} р\."
         body = f"Заказ готового кошелька:\n{service}\n{amount}\n{total_price}"
         return self.__build(body=body)
 
     def get_delivery_form(self, dto: DeliveryDto, username):
-        _list = List.bundleType.value if dto.type == 'bundle' else List.debitType.value
-        service = f"*Сервис:* {self.__get_redacted(text=_list[dto.service])}"
+        service = f"*Сервис:* {self.__get_redacted(dto.service_label)}"
         amount = f"*Количество:* {dto.amount}"
-        address = f"*Адрес доставки:* {self.__get_redacted(text=dto.address or '')}"
-        full_name = f"*ФИО:* {self.__get_redacted(text=dto.full_name or '')}"
-        phone_number = f"*Номер телефона:* {self.__get_redacted(text=dto.phone_number or '')}"
-        telegram = f"\n*Юзернейм:* {self.__get_redacted(text=dto.telegram or '')}" \
+        address = f"*Адрес доставки:* {self.__get_redacted(dto.address or '')}"
+        full_name = f"*ФИО:* {self.__get_redacted(dto.full_name or '')}"
+        phone_number = f"*Номер телефона:* {self.__get_redacted(dto.phone_number or '')}"
+        telegram = f"\n*Юзернейм:* {self.__get_redacted(dto.telegram or '')}" \
             if dto.telegram and dto.telegram != f"@{username}" else ""
-        total_price = f"*К оплате:* {self.__get_redacted(text=str(dto.total_price) or '')} р\."
+        total_price = f"*К оплате:* {self.__get_redacted(str(dto.total_price) or '')} р\."
         body = f"Заказ комплекта:\n{service}\n{address}\n{full_name}\n{phone_number}{telegram}\n{amount}\n{total_price}"
         return self.__build(body=body)
 
@@ -431,18 +433,16 @@ class MessageBuilder:
         body = f"Список Ваших {type_prompt}:"
         for order_id in _list:
             index = list(_list.keys()).index(order_id) + 1
-            service_list: dict | None = self.orderListFactory.get_order_list(_type_key)
-            service = service_list[_list[order_id]['service']] \
-                if (service_list and _list[order_id]['service'] in service_list.keys()) else 'Неизвестно'
+            service = _list[order_id]['service_label'] \
+                if 'service_label' in _list[order_id] and _list[order_id]['service_label'] else 'Неизвестно'
             status = Prompts.statuses.value[_list[order_id]['status']]
             body += f"\n*{index}*\. {order_id} — {self.__get_redacted(service)} — {status}"
         return self.__build(body=body)
 
     def __base_order_info(self, _type, order_info: dict):
-        services = self.orderListFactory.get_order_list(f"{_type}List")
         order_id = order_info['id']
-        service_name = self.__get_redacted(services[order_info['service']]) \
-            if services and order_info['service'] in services.keys() else 'Неизвестно'
+        service_name = self.__get_redacted(order_info['service_label']) \
+            if 'service_label' in order_info and order_info['service_label'] else 'Неизвестно'
         price = self.__get_redacted(f"{order_info['price']} руб.")
         created_at = self.__get_redacted(order_info['created_at'])
         status = Prompts.statusesFull.value[order_info['status']]
