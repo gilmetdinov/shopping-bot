@@ -434,7 +434,7 @@ class MessageBuilder:
         for order_id in _list:
             index = list(_list.keys()).index(order_id) + 1
             service = _list[order_id]['service_label'] \
-                if 'service_label' in _list[order_id] and _list[order_id]['service_label'] else 'Неизвестно'
+                if 'service_label' in _list[order_id].keys() and _list[order_id]['service_label'] else 'Неизвестно'
             status = Prompts.statuses.value[_list[order_id]['status']]
             body += f"\n*{index}*\. {order_id} — {self.__get_redacted(service)} — {status}"
         return self.__build(body=body)
@@ -442,7 +442,7 @@ class MessageBuilder:
     def __base_order_info(self, _type, order_info: dict):
         order_id = order_info['id']
         service_name = self.__get_redacted(order_info['service_label']) \
-            if 'service_label' in order_info and order_info['service_label'] else 'Неизвестно'
+            if 'service_label' in order_info.keys() and order_info['service_label'] else 'Неизвестно'
         price = self.__get_redacted(f"{order_info['price']} руб.")
         created_at = self.__get_redacted(order_info['created_at'])
         status = Prompts.statusesFull.value[order_info['status']]
