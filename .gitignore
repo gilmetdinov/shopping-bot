@@ -1,0 +1,12 @@
+.env
+*.conf
+shopping_bot.egg-info
+supervisor/log
+logs
+tmp
+.venv
+venv
+.idea
+__pycache__
+*.pyc
+.pytest_cache

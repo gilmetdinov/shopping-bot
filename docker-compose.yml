@@ -1,0 +1,13 @@
+version: '3.2'
+
+services:
+  bot:
+    build: .
+    volumes:
+      - ./:/app
+      - ./supervisor/log:/var/log/supervisor
+    environment:
+      PYTHONBUFFERED: 1
+    tty: true
+    ports:
+      - "${PORT}:${PORT}"
